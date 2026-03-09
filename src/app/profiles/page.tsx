@@ -543,7 +543,7 @@ export default function ProfilesPage() {
 
   // 获取关键数据摘要
   const getSummary = () => {
-    const femalePercent = currentData['性别分布'].find(d => d.label === '女性')?.value || 0;
+    const femalePercent = Number(currentData['性别分布'].find(d => d.label === '女性')?.value || 0);
     const topAge = currentData['年龄分布'][0];
     const topProvince = currentData['省份分布'][0];
     const topCrowd = currentData['八大人群分布'][0];
