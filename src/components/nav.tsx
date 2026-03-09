@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileVideo, Tag, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, FileVideo, Tag, TrendingUp, Users } from 'lucide-react';
 
 const navigation = [
   { name: '概览', href: '/', icon: LayoutDashboard },
   { name: '内容列表', href: '/videos', icon: FileVideo },
   { name: '关键词分析', href: '/keywords', icon: Tag },
   { name: '趋势分析', href: '/trends', icon: TrendingUp },
+  { name: '粉丝画像', href: '/profiles', icon: Users },
 ];
 
 export default function Nav() {
