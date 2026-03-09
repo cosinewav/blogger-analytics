@@ -178,8 +178,8 @@ export default function ComparePage() {
 
     if (!base || !compare) return null;
 
-    const femaleBase = base['性别分布'].find(d => d.label === '女性')?.value || 0;
-    const femaleCompare = compare['性别分布'].find(d => d.label === '女性')?.value || 0;
+    const femaleBase = Number(base['性别分布'].find(d => d.label === '女性')?.value || 0);
+    const femaleCompare = Number(compare['性别分布'].find(d => d.label === '女性')?.value || 0);
 
     const topAgeBase = base['年龄分布'][0];
     const topAgeCompare = compare['年龄分布'][0];

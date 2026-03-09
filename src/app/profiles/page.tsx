@@ -8,8 +8,8 @@ import * as echarts from 'echarts';
 import { PageSkeleton } from '@/components/ui/skeleton';
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animations/PageTransition';
 
-// 中国地图 GeoJSON 数据 URL
-const CHINA_MAP_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
+// 中国地图 GeoJSON 数据 URL（使用 jsDelivr CDN，更稳定）
+const CHINA_MAP_URL = 'https://cdn.jsdelivr.net/npm/echarts@5.4.3/map/json/china.json';
 
 interface ProfileItem {
   label: string;
