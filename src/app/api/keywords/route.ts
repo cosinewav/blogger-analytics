@@ -30,6 +30,15 @@ export async function GET() {
 
     videos.forEach(v => {
       v.keywords.forEach(keyword => {
+        // 过滤无效关键词
+        if (!keyword ||
+            keyword === '无法提炼关键词' ||
+            keyword.trim() === '' ||
+            keyword.includes('无法') ||
+            keyword.length < 2) {
+          return;
+        }
+
         if (!keywordMap.has(keyword)) {
           keywordMap.set(keyword, {
             count: 0,

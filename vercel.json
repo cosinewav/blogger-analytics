@@ -3,7 +3,7 @@
   "buildCommand": "next build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "regions": ["hkg1", "sin1"],
+  "regions": ["hkg1"],
   "headers": [
     {
       "source": "/(.*)",

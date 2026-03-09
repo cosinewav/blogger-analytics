@@ -242,23 +242,23 @@ export default function ComparePage() {
                       </div>
                       <div className="flex items-end gap-3">
                         <div>
-                          <div className="text-2xl font-bold text-blue-600">{summaryData.female.base.toFixed(1)}%</div>
+                          <div className="text-2xl font-bold text-blue-600">{(summaryData.female?.base || 0).toFixed(1)}%</div>
                           <div className="text-xs text-gray-500">{selectedAccountObjs[0]?.label}</div>
                         </div>
                         <div className="text-gray-400 pb-1">vs</div>
                         <div>
-                          <div className="text-2xl font-bold text-purple-600">{summaryData.female.compare.toFixed(1)}%</div>
+                          <div className="text-2xl font-bold text-purple-600">{(summaryData.female?.compare || 0).toFixed(1)}%</div>
                           <div className="text-xs text-gray-500">{selectedAccountObjs[1]?.label}</div>
                         </div>
                         <div className={`ml-auto flex items-center gap-1 text-sm ${
-                          summaryData.female.compare > summaryData.female.base ? 'text-green-500' : 'text-red-500'
+                          (summaryData.female?.compare || 0) > (summaryData.female?.base || 0) ? 'text-green-500' : 'text-red-500'
                         }`}>
-                          {summaryData.female.compare > summaryData.female.base ? (
+                          {(summaryData.female?.compare || 0) > (summaryData.female?.base || 0) ? (
                             <TrendingUp className="w-4 h-4" />
                           ) : (
                             <TrendingDown className="w-4 h-4" />
                           )}
-                          {Math.abs(summaryData.female.compare - summaryData.female.base).toFixed(1)}%
+                          {Math.abs((summaryData.female?.compare || 0) - (summaryData.female?.base || 0)).toFixed(1)}%
                         </div>
                       </div>
                     </CardContent>
