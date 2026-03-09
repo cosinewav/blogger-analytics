@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileVideo, Tag, TrendingUp, Users } from 'lucide-react';
+import { LayoutDashboard, FileVideo, Tag, TrendingUp, Users, GitCompare } from 'lucide-react';
 
 const navigation = [
   { name: '概览', href: '/', icon: LayoutDashboard },
@@ -10,6 +10,7 @@ const navigation = [
   { name: '关键词分析', href: '/keywords', icon: Tag },
   { name: '趋势分析', href: '/trends', icon: TrendingUp },
   { name: '粉丝画像', href: '/profiles', icon: Users },
+  { name: '对比分析', href: '/compare', icon: GitCompare },
 ];
 
 export default function Nav() {

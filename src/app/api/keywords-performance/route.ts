@@ -3,6 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import { VideoData } from '@/types';
 
+// ISR: Revalidate every 5 minutes
+export const revalidate = 300;
+
 export async function GET() {
   try {
     const dataPath = path.join(process.cwd(), 'data', 'videos.json');
@@ -68,11 +71,14 @@ export async function GET() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       keywordPerformance,
       spreadDistribution,
       topKeywords,
     });
+    // Cache for 5 minutes on client, stale-while-revalidate for 10 minutes
+    response.headers.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    return response;
   } catch (error) {
     console.error('获取关键词表现数据失败:', error);
     return NextResponse.json({ error: '获取数据失败' }, { status: 500 });

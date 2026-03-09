@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, ExternalLink, X, ChevronDown, ChevronUp, Filter, Calendar, Plus } from 'lucide-react';
+import { Search, ExternalLink, X, ChevronDown, ChevronUp, Filter, Calendar, Plus, Download, FileSpreadsheet, FileText } from 'lucide-react';
 import { DayPicker } from 'react-day-picker';
 import { VideosPageSkeleton } from '@/components/ui/skeleton';
 import { AnimatedNumber, formatChineseNumber } from '@/components/ui/animated-number';
@@ -13,6 +13,9 @@ import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animations/P
 import 'react-day-picker/dist/style.css';
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
+import { exportToCSV, exportToExcel, generateFilename } from '@/lib/export';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 interface Video {
   id: string;
@@ -298,6 +301,57 @@ function VideosContent() {
 
   const hasActiveFilters = searchQuery || spreadLevelFilter !== 'all' || playCountRange.min || playCountRange.max || dateRange.from || dateRange.to || selectedKeywords.length > 0;
 
+  // 导出数据
+  const handleExport = (format: 'csv' | 'excel') => {
+    if (filteredVideos.length === 0) {
+      alert('没有数据可导出');
+      return;
+    }
+
+    const exportData = filteredVideos.map(video => ({
+      标题: video.title || '',
+      发布时间: video.publishedAt ? formatDate(video.publishedAt) : '',
+      播放量: video.playCount,
+      点赞: video.likes,
+      评论: video.comments,
+      分享: typeof video.shares === 'string' ? video.shares : String(video.shares),
+      收藏: video.favorites,
+      传播指数: Number(video.spreadIndex.toFixed(2)),
+      传播等级: video.spreadLevel || '',
+      关键词: video.keywords.join('; '),
+      抖音链接: video.douyinUrl || '',
+    }));
+
+    const filename = generateFilename('videos');
+
+    if (format === 'csv') {
+      const headers = Object.keys(exportData[0]);
+      const csvContent = [
+        headers.join(','),
+        ...exportData.map(row =>
+          headers.map(h => {
+            const value = row[h as keyof typeof row];
+            if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+              return `"${value.replace(/"/g, '""')}"`;
+            }
+            return value;
+          }).join(',')
+        )
+      ].join('\n');
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      saveAs(blob, `${filename}.csv`);
+    } else {
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, '视频数据');
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `${filename}.xlsx`);
+    }
+  };
+
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
   if (loading) {
     return <VideosPageSkeleton />;
   }
@@ -326,29 +380,75 @@ function VideosContent() {
         )}
 
         {/* 快速筛选按钮 */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          {quickFilters.map((qf, index) => (
+        <div className="flex flex-wrap gap-2 mb-4 items-center justify-between">
+          <div className="flex flex-wrap gap-2">
+            {quickFilters.map((qf, index) => (
+              <Button
+                key={index}
+                variant="outline"
+                size="sm"
+                onClick={qf.filter}
+                className="hover:bg-blue-50"
+              >
+                {qf.label}
+              </Button>
+            ))}
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAllFilters}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <X className="w-4 h-4 mr-1" />
+                清除筛选
+              </Button>
+            )}
+          </div>
+
+          {/* 导出按钮 */}
+          <div className="relative">
             <Button
-              key={index}
               variant="outline"
               size="sm"
-              onClick={qf.filter}
-              className="hover:bg-blue-50"
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="flex items-center gap-2"
             >
-              {qf.label}
+              <Download className="w-4 h-4" />
+              导出数据
+              <ChevronDown className="w-3 h-3" />
             </Button>
-          ))}
-          {hasActiveFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearAllFilters}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            >
-              <X className="w-4 h-4 mr-1" />
-              清除筛选
-            </Button>
-          )}
+            {showExportMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowExportMenu(false)}
+                />
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border z-50 py-1">
+                  <button
+                    onClick={() => {
+                      handleExport('csv');
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <FileText className="w-4 h-4 text-gray-500" />
+                    导出为 CSV
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleExport('excel');
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-green-500" />
+                    导出为 Excel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* 主筛选栏 */}

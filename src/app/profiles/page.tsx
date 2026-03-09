@@ -8,6 +8,9 @@ import * as echarts from 'echarts';
 import { PageSkeleton } from '@/components/ui/skeleton';
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animations/PageTransition';
 
+// 中国地图 GeoJSON 数据 URL
+const CHINA_MAP_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
+
 interface ProfileItem {
   label: string;
   value: number;
@@ -47,8 +50,10 @@ export default function ProfilesPage() {
   const [profilesData, setProfilesData] = useState<ProfilesData | null>(null);
   const [activeAccount, setActiveAccount] = useState('哈佛亮爸');
   const [loading, setLoading] = useState(true);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   const genderChartRef = useRef<ReactECharts>(null);
+  const mapChartRef = useRef<ReactECharts>(null);
   const ageChartRef = useRef<ReactECharts>(null);
   const cityLevelChartRef = useRef<ReactECharts>(null);
   const crowdChartRef = useRef<ReactECharts>(null);
@@ -67,6 +72,20 @@ export default function ProfilesPage() {
       .catch(err => {
         console.error('获取数据失败:', err);
         setLoading(false);
+      });
+  }, []);
+
+  // 加载中国地图
+  useEffect(() => {
+    fetch(CHINA_MAP_URL)
+      .then(res => res.json())
+      .then(geoJson => {
+        echarts.registerMap('china', geoJson);
+        setMapLoaded(true);
+      })
+      .catch(err => {
+        console.error('加载地图数据失败:', err);
+        setMapLoaded(true); // 即使失败也继续显示
       });
   }, []);
 
@@ -452,6 +471,76 @@ export default function ProfilesPage() {
     }],
   };
 
+  // 中国地图 - 粉丝地域分布
+  const mapOption: echarts.EChartsOption = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: '#1f2937',
+      borderColor: '#374151',
+      textStyle: { color: '#fff' },
+      formatter: (params: any) => {
+        if (params.value) {
+          return `<div style="padding: 8px;">
+            <p style="font-weight: bold; margin-bottom: 4px;">${params.name}</p>
+            <p>占比: ${params.value}%</p>
+          </div>`;
+        }
+        return params.name;
+      },
+    },
+    visualMap: {
+      min: 0,
+      max: Math.max(...currentData['省份分布'].map(d => d.value)),
+      left: 'left',
+      top: 'bottom',
+      text: ['高', '低'],
+      textStyle: { color: '#9ca3af' },
+      inRange: {
+        color: ['#3b82f6', '#8b5cf6', '#ec4899'],
+      },
+      calculable: true,
+    },
+    geo: {
+      map: 'china',
+      roam: true,
+      zoom: 1.2,
+      center: [104, 36],
+      scaleLimit: { min: 0.5, max: 5 },
+      label: {
+        show: false,
+        color: '#fff',
+        fontSize: 10,
+      },
+      emphasis: {
+        label: {
+          show: true,
+          color: '#fff',
+        },
+        itemStyle: {
+          areaColor: '#f59e0b',
+          shadowBlur: 20,
+          shadowColor: 'rgba(0, 0, 0, 0.5)',
+        },
+      },
+      itemStyle: {
+        areaColor: '#374151',
+        borderColor: '#1f2937',
+        borderWidth: 1,
+      },
+    },
+    series: [{
+      name: '粉丝占比',
+      type: 'map',
+      map: 'china',
+      geoIndex: 0,
+      data: currentData['省份分布'].map(d => ({
+        name: d.label,
+        value: d.value,
+      })),
+    }],
+  };
+
   // 获取关键数据摘要
   const getSummary = () => {
     const femalePercent = currentData['性别分布'].find(d => d.label === '女性')?.value || 0;
@@ -640,6 +729,32 @@ export default function ProfilesPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* 中国地图 - 粉丝地域分布 */}
+        {mapLoaded && (
+          <Card className="mb-6">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <span className="text-xl">🇨🇳</span>
+                  粉丝地域分布地图
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={() => exportChartAsPNG(mapChartRef, `map-${activeAccount}`)}>
+                  导出PNG
+                </Button>
+              </div>
+              <p className="text-sm text-gray-600">支持缩放和拖拽查看，颜色深浅代表粉丝占比</p>
+            </CardHeader>
+            <CardContent>
+              <ReactECharts
+                ref={mapChartRef}
+                option={mapOption}
+                style={{ height: 500 }}
+                opts={{ renderer: 'canvas' }}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* 第四行：消费偏好 */}
         <div className="grid gap-6 md:grid-cols-2">

@@ -228,3 +228,111 @@ export function KeywordsPageSkeleton() {
     </div>
   );
 }
+
+// Trends page skeleton with charts
+export function TrendsPageSkeleton() {
+  return (
+    <div className="p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <Skeleton className="h-10 w-40 mb-2" />
+          <Skeleton className="h-5 w-64" />
+        </div>
+
+        {/* Stats cards */}
+        <div className="grid gap-4 md:grid-cols-4 mb-8">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+
+        {/* Month selector */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 mb-6 shadow-sm">
+          <Skeleton className="h-6 w-40 mb-4" />
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-28" />
+            ))}
+          </div>
+        </div>
+
+        {/* Main chart */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 mb-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-8 w-24" />
+          </div>
+          <ChartSkeleton height={400} />
+        </div>
+
+        {/* Two column charts */}
+        <div className="grid gap-6 md:grid-cols-2 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+            <Skeleton className="h-6 w-32 mb-4" />
+            <ChartSkeleton height={350} />
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+            <Skeleton className="h-6 w-32 mb-4" />
+            <ChartSkeleton height={350} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Profiles page skeleton with multiple chart areas
+export function ProfilesPageSkeleton() {
+  return (
+    <div className="p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6">
+          <Skeleton className="h-10 w-32 mb-2" />
+          <Skeleton className="h-5 w-72" />
+        </div>
+
+        {/* Account tabs */}
+        <div className="flex gap-2 mb-6">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-28" />
+          ))}
+        </div>
+
+        {/* Stats cards */}
+        <div className="grid gap-4 md:grid-cols-5 mb-8">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+
+        {/* First row: 3 charts */}
+        <div className="grid gap-6 md:grid-cols-3 mb-6">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+              <Skeleton className="h-6 w-24 mb-4" />
+              <ChartSkeleton height={280} />
+            </div>
+          ))}
+        </div>
+
+        {/* Radar chart */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 mb-6 shadow-sm">
+          <Skeleton className="h-6 w-32 mb-4" />
+          <ChartSkeleton height={400} />
+        </div>
+
+        {/* Second row: 2 charts */}
+        <div className="grid gap-6 md:grid-cols-2 mb-6">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+              <Skeleton className="h-6 w-28 mb-4" />
+              <ChartSkeleton height={350} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -40,6 +40,15 @@ interface SpreadDistribution {
   color: string;
 }
 
+interface HeatmapData {
+  videoCountData: [number, number, number][];
+  avgPlayCountData: [number, number, number][];
+  maxVideoCount: number;
+  maxAvgPlay: number;
+  days: string[];
+  hours: string[];
+}
+
 function formatNumber(num: number): string {
   if (num >= 100000000) return `${(num / 100000000).toFixed(2)}亿`;
   if (num >= 10000) return `${(num / 10000).toFixed(1)}万`;
@@ -51,6 +60,7 @@ export default function TrendsPage() {
   const [keywordPerformance, setKeywordPerformance] = useState<KeywordPerformance[]>([]);
   const [spreadDistribution, setSpreadDistribution] = useState<SpreadDistribution[]>([]);
   const [topKeywords, setTopKeywords] = useState<KeywordPerformance[]>([]);
+  const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -60,6 +70,7 @@ export default function TrendsPage() {
   const avgPlayChartRef = useRef<ReactECharts>(null);
   const spreadChartRef = useRef<ReactECharts>(null);
   const keywordChartRef = useRef<ReactECharts>(null);
+  const heatmapChartRef = useRef<ReactECharts>(null);
 
   useEffect(() => {
     fetch('/api/trends')
@@ -72,10 +83,19 @@ export default function TrendsPage() {
         setKeywordPerformance(data.keywordPerformance);
         setSpreadDistribution(data.spreadDistribution);
         setTopKeywords(data.topKeywords);
-        setLoading(false);
       })
       .catch(err => {
         console.error('获取数据失败:', err);
+      });
+
+    fetch('/api/heatmap')
+      .then(res => res.json())
+      .then(data => {
+        setHeatmapData(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('获取热力图数据失败:', err);
         setLoading(false);
       });
   }, []);
@@ -406,6 +426,69 @@ export default function TrendsPage() {
     }],
   };
 
+  // 发布时间热力图配置
+  const heatmapOption: echarts.EChartsOption = heatmapData ? {
+    backgroundColor: 'transparent',
+    tooltip: {
+      position: 'top',
+      backgroundColor: '#1f2937',
+      borderColor: '#374151',
+      textStyle: { color: '#fff' },
+      formatter: (params: any) => {
+        return `<div style="padding: 8px;">
+          <p style="font-weight: bold; margin-bottom: 4px;">${heatmapData.days[params.data[0]]} ${heatmapData.hours[params.data[1]]}</p>
+          <p>视频数: ${params.data[2]}</p>
+          <p>平均播放: ${formatNumber(heatmapData.avgPlayCountData.find(d => d[0] === params.data[0] && d[1] === params.data[1])?.[2] || 0)}</p>
+        </div>`;
+      },
+    },
+    grid: {
+      left: '8%',
+      right: '15%',
+      top: '5%',
+      bottom: '15%',
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'category',
+      data: heatmapData.days,
+      splitArea: { show: true },
+      axisLabel: { color: '#9ca3af', fontSize: 12 },
+      axisLine: { lineStyle: { color: '#374151' } },
+    },
+    yAxis: {
+      type: 'category',
+      data: heatmapData.hours,
+      splitArea: { show: true },
+      axisLabel: { color: '#9ca3af', fontSize: 10 },
+      axisLine: { lineStyle: { color: '#374151' } },
+    },
+    visualMap: {
+      min: 0,
+      max: heatmapData.maxVideoCount,
+      calculable: true,
+      orient: 'vertical',
+      right: 10,
+      top: 'center',
+      inRange: {
+        color: ['#1f2937', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b'],
+      },
+      textStyle: { color: '#9ca3af' },
+    },
+    series: [{
+      name: '发布时间',
+      type: 'heatmap',
+      data: heatmapData.videoCountData,
+      label: { show: false },
+      emphasis: {
+        itemStyle: {
+          shadowBlur: 10,
+          shadowColor: 'rgba(0, 0, 0, 0.5)',
+        },
+      },
+    }],
+  } : {};
+
   // 全局暴露跳转函数
   if (typeof window !== 'undefined') {
     (window as any).goToMonth = goToMonth;
@@ -639,6 +722,32 @@ export default function TrendsPage() {
             />
           </CardContent>
         </Card>
+
+        {/* 发布时间热力图 */}
+        {heatmapData && (
+          <Card className="mb-6">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <span className="text-2xl">🕐</span>
+                  发布时间热力图
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={() => exportChartAsPNG(heatmapChartRef, 'publish-heatmap')}>
+                  导出PNG
+                </Button>
+              </div>
+              <p className="text-sm text-gray-600">横轴为星期，纵轴为小时，颜色深浅代表发布视频数量，帮助发现最佳发布时间</p>
+            </CardHeader>
+            <CardContent>
+              <ReactECharts
+                ref={heatmapChartRef}
+                option={heatmapOption}
+                style={{ height: 450 }}
+                opts={{ renderer: 'canvas' }}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* 月度数据表格 */}
         <Card>
