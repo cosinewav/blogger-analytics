@@ -8,6 +8,15 @@ export const revalidate = 300;
 export async function GET() {
   try {
     const dataPath = path.join(process.cwd(), 'data', 'fan-profiles.json');
+
+    // Check if file exists before reading
+    if (!fs.existsSync(dataPath)) {
+      console.warn('粉丝画像数据文件不存在:', dataPath);
+      const emptyResponse = NextResponse.json([]);
+      emptyResponse.headers.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+      return emptyResponse;
+    }
+
     const data = fs.readFileSync(dataPath, 'utf-8');
     const profiles = JSON.parse(data);
 
@@ -17,6 +26,9 @@ export async function GET() {
     return response;
   } catch (error) {
     console.error('获取粉丝画像数据失败:', error);
-    return NextResponse.json({ error: '获取粉丝画像数据失败' }, { status: 500 });
+    // Return empty array instead of error for better UX
+    const emptyResponse = NextResponse.json([]);
+    emptyResponse.headers.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    return emptyResponse;
   }
 }

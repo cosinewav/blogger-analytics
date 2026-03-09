@@ -9,6 +9,22 @@ export const revalidate = 300;
 export async function GET() {
   try {
     const dataPath = path.join(process.cwd(), 'data', 'videos.json');
+
+    // Check if file exists before reading
+    if (!fs.existsSync(dataPath)) {
+      console.warn('视频数据文件不存在:', dataPath);
+      const emptyResponse = NextResponse.json({
+        videoCountData: [],
+        avgPlayCountData: [],
+        maxVideoCount: 0,
+        maxAvgPlay: 0,
+        days: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
+        hours: Array.from({ length: 24 }, (_, i) => `${i}:00`),
+      });
+      emptyResponse.headers.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+      return emptyResponse;
+    }
+
     const data = fs.readFileSync(dataPath, 'utf-8');
     const videos: VideoData[] = JSON.parse(data);
 
@@ -66,6 +82,16 @@ export async function GET() {
     return response;
   } catch (error) {
     console.error('获取热力图数据失败:', error);
-    return NextResponse.json({ error: '获取数据失败' }, { status: 500 });
+    // Return empty data instead of error for better UX
+    const emptyResponse = NextResponse.json({
+      videoCountData: [],
+      avgPlayCountData: [],
+      maxVideoCount: 0,
+      maxAvgPlay: 0,
+      days: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
+      hours: Array.from({ length: 24 }, (_, i) => `${i}:00`),
+    });
+    emptyResponse.headers.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    return emptyResponse;
   }
 }
