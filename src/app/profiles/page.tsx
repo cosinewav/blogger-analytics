@@ -8,8 +8,8 @@ import * as echarts from 'echarts';
 import { PageSkeleton } from '@/components/ui/skeleton';
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animations/PageTransition';
 
-// 中国地图 GeoJSON 数据 URL（使用 unpkg CDN）
-const CHINA_MAP_URL = 'https://unpkg.com/echarts@5.4.3/map/json/china.json';
+// 中国地图 GeoJSON 数据 URL（本地文件，避免 CORS）
+const CHINA_MAP_URL = '/china.json';
 
 interface ProfileItem {
   label: string;
