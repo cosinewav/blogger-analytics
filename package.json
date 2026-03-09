@@ -2,9 +2,15 @@
   "name": "analytics-web",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "cf:build": "npm run build",
+    "cf:dev": "npx wrangler pages dev out --compatibility-date=2026-03-09",
+    "cf:deploy": "npx wrangler pages deploy out --project-name blogger-analytics",
     "start": "next start",
     "lint": "eslint",
     "sync": "npx tsx scripts/sync-feishu-data.ts",
