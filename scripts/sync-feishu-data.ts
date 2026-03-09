@@ -155,11 +155,11 @@ async function main() {
       avgPlayCount: 0,
       keywords: new Set(videos.flatMap(v => v.keywords)).size,
       dateRange: {
-        earliest: videos.filter(v => v.publishedAt).sort((a, b) => 
-          new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime()
+        earliest: videos.filter(v => v.publishedAt).sort((a, b) =>
+          new Date(a.publishedAt!).getTime() - new Date(b.publishedAt!).getTime()
         )[0]?.publishedAt,
-        latest: videos.filter(v => v.publishedAt).sort((a, b) => 
-          new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+        latest: videos.filter(v => v.publishedAt).sort((a, b) =>
+          new Date(b.publishedAt!).getTime() - new Date(a.publishedAt!).getTime()
         )[0]?.publishedAt,
       },
     };

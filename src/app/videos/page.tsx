@@ -1,11 +1,18 @@
 'use client';
 
-import { useState, useEffect, useMemo, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, useMemo, Suspense, useRef, useCallback } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, ExternalLink, X, ChevronDown, ChevronUp, Filter } from 'lucide-react';
+import { Search, ExternalLink, X, ChevronDown, ChevronUp, Filter, Calendar, Plus } from 'lucide-react';
+import { DayPicker } from 'react-day-picker';
+import { VideosPageSkeleton } from '@/components/ui/skeleton';
+import { AnimatedNumber, formatChineseNumber } from '@/components/ui/animated-number';
+import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animations/PageTransition';
+import 'react-day-picker/dist/style.css';
+import { format, isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 
 interface Video {
   id: string;
@@ -32,10 +39,96 @@ function VideosContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [playCountRange, setPlayCountRange] = useState<{ min: string; max: string }>({ min: '', max: '' });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  // Date range picker state
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined,
+  });
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
+
+  // Multi-keyword filter state
+  const [keywordInput, setKeywordInput] = useState('');
+  const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
+
   const itemsPerPage = 20;
-  
+
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const dateFilter = searchParams.get('date');
+
+  // Update URL with current filter state
+  const updateUrlParams = useCallback((params: Record<string, string | null>) => {
+    const newParams = new URLSearchParams(searchParams.toString());
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === null || value === '' || value === undefined) {
+        newParams.delete(key);
+      } else {
+        newParams.set(key, value);
+      }
+    });
+
+    const newUrl = newParams.toString() ? `${pathname}?${newParams.toString()}` : pathname;
+    router.replace(newUrl, { scroll: false });
+  }, [searchParams, router, pathname]);
+
+  // Initialize filters from URL on mount
+  useEffect(() => {
+    const query = searchParams.get('q');
+    const level = searchParams.get('level');
+    const sort = searchParams.get('sort');
+    const order = searchParams.get('order');
+    const minPlays = searchParams.get('minPlays');
+    const maxPlays = searchParams.get('maxPlays');
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
+    const keywords = searchParams.get('keywords');
+    const page = searchParams.get('page');
+
+    if (query) setSearchQuery(query);
+    if (level) setSpreadLevelFilter(level);
+    if (sort) setSortField(sort as 'playCount' | 'spreadIndex' | 'publishedAt');
+    if (order) setSortOrder(order as 'asc' | 'desc');
+    if (minPlays || maxPlays) setPlayCountRange({ min: minPlays || '', max: maxPlays || '' });
+    if (dateFrom) setDateRange(prev => ({ ...prev, from: new Date(dateFrom) }));
+    if (dateTo) setDateRange(prev => ({ ...prev, to: new Date(dateTo) }));
+    if (keywords) setSelectedKeywords(keywords.split(',').filter(k => k.trim()));
+    if (page) setCurrentPage(parseInt(page) || 1);
+  }, []); // Only run once on mount
+
+  // Sync filter changes to URL (debounced)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updateUrlParams({
+        q: searchQuery || null,
+        level: spreadLevelFilter !== 'all' ? spreadLevelFilter : null,
+        sort: sortField !== 'playCount' ? sortField : null,
+        order: sortOrder !== 'desc' ? sortOrder : null,
+        minPlays: playCountRange.min || null,
+        maxPlays: playCountRange.max || null,
+        dateFrom: dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : null,
+        dateTo: dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : null,
+        keywords: selectedKeywords.length > 0 ? selectedKeywords.join(',') : null,
+        page: currentPage > 1 ? currentPage.toString() : null,
+        date: dateFilter, // Preserve the original date filter from trends page
+      });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, spreadLevelFilter, sortField, sortOrder, playCountRange, dateRange, selectedKeywords, currentPage]);
+
+  // Close date picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setShowDatePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // 获取数据
   useEffect(() => {
@@ -65,12 +158,40 @@ function VideosContent() {
       });
     }
 
+    // Date range picker filter
+    if (dateRange.from || dateRange.to) {
+      result = result.filter((video) => {
+        if (!video.publishedAt) return false;
+        const videoDate = parseISO(video.publishedAt);
+        const from = dateRange.from ? startOfDay(dateRange.from) : null;
+        const to = dateRange.to ? endOfDay(dateRange.to) : null;
+        if (from && to) {
+          return isWithinInterval(videoDate, { start: from, end: to });
+        } else if (from) {
+          return videoDate >= from;
+        } else if (to) {
+          return videoDate <= to;
+        }
+        return true;
+      });
+    }
+
     // 搜索
     if (searchQuery) {
       result = result.filter(
         (video) =>
           video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           video.keywords.some((k) => k.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    }
+
+    // Multi-keyword filter
+    if (selectedKeywords.length > 0) {
+      result = result.filter((video) =>
+        selectedKeywords.some((keyword) =>
+          video.keywords.some((k) => k.toLowerCase().includes(keyword.toLowerCase())) ||
+          video.title.toLowerCase().includes(keyword.toLowerCase())
+        )
       );
     }
 
@@ -89,7 +210,7 @@ function VideosContent() {
     // 排序
     result.sort((a, b) => {
       let aVal: number, bVal: number;
-      
+
       if (sortField === 'publishedAt') {
         aVal = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
         bVal = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
@@ -97,12 +218,45 @@ function VideosContent() {
         aVal = a[sortField];
         bVal = b[sortField];
       }
-      
+
       return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
     });
 
     return result;
-  }, [videos, searchQuery, spreadLevelFilter, sortField, sortOrder, dateFilter, playCountRange]);
+  }, [videos, searchQuery, spreadLevelFilter, sortField, sortOrder, dateFilter, playCountRange, dateRange, selectedKeywords]);
+
+  // Get all unique keywords from videos for suggestions
+  const allKeywords = useMemo(() => {
+    const keywordSet = new Set<string>();
+    videos.forEach((video) => {
+      video.keywords.forEach((k) => keywordSet.add(k));
+    });
+    return Array.from(keywordSet).sort();
+  }, [videos]);
+
+  // Add keyword handler
+  const addKeyword = (keyword: string) => {
+    const trimmed = keyword.trim();
+    if (trimmed && !selectedKeywords.includes(trimmed)) {
+      setSelectedKeywords([...selectedKeywords, trimmed]);
+      setKeywordInput('');
+      setCurrentPage(1);
+    }
+  };
+
+  // Remove keyword handler
+  const removeKeyword = (keyword: string) => {
+    setSelectedKeywords(selectedKeywords.filter((k) => k !== keyword));
+    setCurrentPage(1);
+  };
+
+  // Handle keyword input key press
+  const handleKeywordKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addKeyword(keywordInput);
+    }
+  };
 
   // 分页
   const totalPages = Math.ceil(filteredVideos.length / itemsPerPage);
@@ -137,20 +291,15 @@ function VideosContent() {
     setSearchQuery('');
     setSpreadLevelFilter('all');
     setPlayCountRange({ min: '', max: '' });
+    setDateRange({ from: undefined, to: undefined });
+    setSelectedKeywords([]);
     setCurrentPage(1);
   };
 
-  const hasActiveFilters = searchQuery || spreadLevelFilter !== 'all' || playCountRange.min || playCountRange.max;
+  const hasActiveFilters = searchQuery || spreadLevelFilter !== 'all' || playCountRange.min || playCountRange.max || dateRange.from || dateRange.to || selectedKeywords.length > 0;
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">加载中...</p>
-        </div>
-      </div>
-    );
+    return <VideosPageSkeleton />;
   }
 
   return (
@@ -217,6 +366,55 @@ function VideosContent() {
             />
           </div>
 
+          {/* Date Range Picker */}
+          <div className="relative" ref={datePickerRef}>
+            <Button
+              variant="outline"
+              onClick={() => setShowDatePicker(!showDatePicker)}
+              className="flex items-center gap-2 min-w-[180px]"
+            >
+              <Calendar className="w-4 h-4" />
+              {dateRange.from ? (
+                dateRange.to ? (
+                  <span className="text-sm">
+                    {format(dateRange.from, 'MM/dd', { locale: zhCN })} - {format(dateRange.to, 'MM/dd', { locale: zhCN })}
+                  </span>
+                ) : (
+                  <span className="text-sm">{format(dateRange.from, 'MM/dd', { locale: zhCN })}</span>
+                )
+              ) : (
+                <span className="text-sm text-gray-500">选择日期范围</span>
+              )}
+              {dateRange.from && (
+                <X
+                  className="w-3 h-3 ml-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDateRange({ from: undefined, to: undefined });
+                    setCurrentPage(1);
+                  }}
+                />
+              )}
+            </Button>
+            {showDatePicker && (
+              <div className="absolute top-full left-0 mt-2 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg border p-2">
+                <DayPicker
+                  mode="range"
+                  selected={dateRange}
+                  onSelect={(range) => {
+                    setDateRange(range ? { from: range.from, to: range.to } : { from: undefined, to: undefined });
+                    if (range?.from && range?.to) {
+                      setShowDatePicker(false);
+                    }
+                    setCurrentPage(1);
+                  }}
+                  locale={zhCN}
+                  numberOfMonths={2}
+                />
+              </div>
+            )}
+          </div>
+
           <select
             value={spreadLevelFilter}
             onChange={(e) => {
@@ -263,6 +461,56 @@ function VideosContent() {
           </Button>
         </div>
 
+        {/* Multi-keyword filter */}
+        <div className="mb-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-gray-600">关键词筛选：</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              {selectedKeywords.map((keyword) => (
+                <Badge key={keyword} variant="secondary" className="flex items-center gap-1">
+                  {keyword}
+                  <X
+                    className="w-3 h-3 cursor-pointer"
+                    onClick={() => removeKeyword(keyword)}
+                  />
+                </Badge>
+              ))}
+            </div>
+            <div className="relative flex items-center gap-2">
+              <Input
+                placeholder="输入关键词后按 Enter..."
+                value={keywordInput}
+                onChange={(e) => setKeywordInput(e.target.value)}
+                onKeyPress={handleKeywordKeyPress}
+                className="w-48 h-8"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => addKeyword(keywordInput)}
+                className="h-8 px-2"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+            {allKeywords.length > 0 && selectedKeywords.length === 0 && (
+              <div className="flex items-center gap-1 flex-wrap">
+                <span className="text-xs text-gray-400">热门：</span>
+                {allKeywords.slice(0, 8).map((keyword) => (
+                  <Badge
+                    key={keyword}
+                    variant="outline"
+                    className="cursor-pointer text-xs hover:bg-gray-100"
+                    onClick={() => addKeyword(keyword)}
+                  >
+                    {keyword}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* 高级筛选 */}
         {showAdvancedFilters && (
           <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 mb-4">
@@ -296,11 +544,11 @@ function VideosContent() {
         )}
 
         {/* 统计信息 */}
-        <div className="text-sm text-gray-600 mb-4 flex items-center gap-4">
+        <FadeIn className="text-sm text-gray-600 mb-4 flex items-center gap-4">
           <span>
-            共 <strong className="text-blue-600">{filteredVideos.length}</strong> 条记录
+            共 <strong className="text-blue-600"><AnimatedNumber value={filteredVideos.length} /></strong> 条记录
             {filteredVideos.length !== videos.length && (
-              <span>（已从 {videos.length} 条中筛选）</span>
+              <span>（已从 <AnimatedNumber value={videos.length} /> 条中筛选）</span>
             )}
           </span>
           {hasActiveFilters && (
@@ -324,7 +572,7 @@ function VideosContent() {
               )}
             </div>
           )}
-        </div>
+        </FadeIn>
 
         {/* 表格 */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
@@ -446,14 +694,7 @@ function VideosContent() {
 
 export default function VideosPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">加载中...</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<VideosPageSkeleton />}>
       <VideosContent />
     </Suspense>
   );

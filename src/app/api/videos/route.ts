@@ -22,7 +22,7 @@ export async function GET() {
       spreadLevel: v.spreadLevel,
       keywords: v.keywords,
       publishedAt: v.publishedAt,
-      douyinUrl: typeof v.douyinUrl === 'object' ? v.douyinUrl?.link : v.douyinUrl,
+      douyinUrl: typeof v.douyinUrl === 'object' && v.douyinUrl !== null ? (v.douyinUrl as { link: string }).link : v.douyinUrl as string,
     }));
 
     return NextResponse.json(formattedVideos);

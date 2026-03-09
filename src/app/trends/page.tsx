@@ -1,24 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  AreaChart,
-  Area,
-  ComposedChart,
-  Bar,
-  BarChart,
-} from 'recharts';
+import ReactECharts from 'echarts-for-react';
+import * as echarts from 'echarts';
 import { useRouter } from 'next/navigation';
+import { PageSkeleton } from '@/components/ui/skeleton';
+import { AnimatedNumber, formatChineseNumber } from '@/components/ui/animated-number';
+import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animations/PageTransition';
 
 interface TrendData {
   date: string;
@@ -62,8 +52,14 @@ export default function TrendsPage() {
   const [spreadDistribution, setSpreadDistribution] = useState<SpreadDistribution[]>([]);
   const [topKeywords, setTopKeywords] = useState<KeywordPerformance[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeDate, setActiveDate] = useState<string | null>(null);
   const router = useRouter();
+
+  const playCountChartRef = useRef<ReactECharts>(null);
+  const interactionChartRef = useRef<ReactECharts>(null);
+  const contentChartRef = useRef<ReactECharts>(null);
+  const avgPlayChartRef = useRef<ReactECharts>(null);
+  const spreadChartRef = useRef<ReactECharts>(null);
+  const keywordChartRef = useRef<ReactECharts>(null);
 
   useEffect(() => {
     fetch('/api/trends')
@@ -84,20 +80,335 @@ export default function TrendsPage() {
       });
   }, []);
 
-  // 跳转到某月的视频列表
   const goToMonth = (date: string) => {
     router.push(`/videos?date=${date}`);
   };
 
+  const exportChartAsPNG = (chartRef: React.RefObject<ReactECharts | null>, fileName: string) => {
+    const instance = chartRef.current?.getEchartsInstance();
+    if (instance) {
+      const url = instance.getDataURL({
+        type: 'png',
+        pixelRatio: 2,
+        backgroundColor: '#1f2937',
+      });
+      const link = document.createElement('a');
+      link.download = `${fileName}.png`;
+      link.href = url;
+      link.click();
+    }
+  };
+
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">加载中...</p>
-        </div>
-      </div>
-    );
+    return <PageSkeleton />;
+  }
+
+  // 播放量趋势配置
+  const playCountOption: echarts.EChartsOption = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#1f2937',
+      borderColor: '#374151',
+      textStyle: { color: '#fff' },
+      formatter: (params: any) => {
+        const data = params[0];
+        return `
+          <div style="padding: 8px;">
+            <p style="font-weight: bold; margin-bottom: 8px;">${data.name}</p>
+            <p style="color: #3b82f6;">播放量: ${formatNumber(data.value)}</p>
+            <button onclick="window.goToMonth('${data.name}')" style="margin-top: 8px; padding: 4px 12px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              查看该月视频 →
+            </button>
+          </div>
+        `;
+      },
+    },
+    grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: trendData.map(d => d.date),
+      axisLabel: { color: '#9ca3af', fontSize: 12 },
+      axisLine: { lineStyle: { color: '#374151' } },
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#9ca3af', fontSize: 12, formatter: (v: number) => formatNumber(v) },
+      splitLine: { lineStyle: { color: '#374151', type: 'dashed' } },
+    },
+    dataZoom: [
+      { type: 'slider', start: 0, end: 100, bottom: 10 },
+      { type: 'inside', start: 0, end: 100 },
+    ],
+    series: [{
+      name: '播放量',
+      type: 'line',
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      data: trendData.map(d => d.playCount),
+      lineStyle: { color: '#3b82f6', width: 3 },
+      itemStyle: { color: '#3b82f6' },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(59, 130, 246, 0.8)' },
+          { offset: 1, color: 'rgba(59, 130, 246, 0.1)' },
+        ]),
+      },
+    }],
+  };
+
+  // 互动数据趋势配置
+  const interactionOption: echarts.EChartsOption = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#1f2937',
+      borderColor: '#374151',
+      textStyle: { color: '#fff' },
+    },
+    legend: {
+      data: ['点赞数', '评论数', '分享数'],
+      textStyle: { color: '#9ca3af' },
+      top: 0,
+      selected: { '点赞数': true, '评论数': true, '分享数': true },
+    },
+    grid: { left: '3%', right: '4%', bottom: '15%', top: '15%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: trendData.map(d => d.date),
+      axisLabel: { color: '#9ca3af', fontSize: 11 },
+      axisLine: { lineStyle: { color: '#374151' } },
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#9ca3af', fontSize: 11, formatter: (v: number) => formatNumber(v) },
+      splitLine: { lineStyle: { color: '#374151', type: 'dashed' } },
+    },
+    dataZoom: [
+      { type: 'slider', start: 0, end: 100, bottom: 10 },
+      { type: 'inside', start: 0, end: 100 },
+    ],
+    series: [
+      {
+        name: '点赞数',
+        type: 'line',
+        smooth: true,
+        data: trendData.map(d => d.likes),
+        lineStyle: { color: '#f43f5e', width: 2 },
+        itemStyle: { color: '#f43f5e' },
+        symbol: 'circle',
+        symbolSize: 6,
+      },
+      {
+        name: '评论数',
+        type: 'line',
+        smooth: true,
+        data: trendData.map(d => d.comments),
+        lineStyle: { color: '#8b5cf6', width: 2 },
+        itemStyle: { color: '#8b5cf6' },
+        symbol: 'circle',
+        symbolSize: 6,
+      },
+      {
+        name: '分享数',
+        type: 'line',
+        smooth: true,
+        data: trendData.map(d => d.shares),
+        lineStyle: { color: '#06b6d4', width: 2 },
+        itemStyle: { color: '#06b6d4' },
+        symbol: 'circle',
+        symbolSize: 6,
+      },
+    ],
+  };
+
+  // 内容产出与爆款趋势配置
+  const contentOption: echarts.EChartsOption = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#1f2937',
+      borderColor: '#374151',
+      textStyle: { color: '#fff' },
+    },
+    legend: {
+      data: ['总视频数', '爆款数量', '优质内容'],
+      textStyle: { color: '#9ca3af' },
+      top: 0,
+      selected: { '总视频数': true, '爆款数量': true, '优质内容': true },
+    },
+    grid: { left: '3%', right: '4%', bottom: '15%', top: '15%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: trendData.map(d => d.date),
+      axisLabel: { color: '#9ca3af', fontSize: 11 },
+      axisLine: { lineStyle: { color: '#374151' } },
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#9ca3af', fontSize: 11 },
+      splitLine: { lineStyle: { color: '#374151', type: 'dashed' } },
+    },
+    dataZoom: [
+      { type: 'slider', start: 0, end: 100, bottom: 10 },
+      { type: 'inside', start: 0, end: 100 },
+    ],
+    series: [
+      {
+        name: '总视频数',
+        type: 'bar',
+        data: trendData.map(d => d.videoCount),
+        itemStyle: { color: '#6366f1', borderRadius: [4, 4, 0, 0] },
+      },
+      {
+        name: '爆款数量',
+        type: 'line',
+        smooth: true,
+        data: trendData.map(d => d.hotCount),
+        lineStyle: { color: '#ef4444', width: 2 },
+        itemStyle: { color: '#ef4444' },
+        symbol: 'circle',
+        symbolSize: 6,
+      },
+      {
+        name: '优质内容',
+        type: 'line',
+        smooth: true,
+        data: trendData.map(d => d.qualityCount),
+        lineStyle: { color: '#22c55e', width: 2 },
+        itemStyle: { color: '#22c55e' },
+        symbol: 'circle',
+        symbolSize: 6,
+      },
+    ],
+  };
+
+  // 平均播放量趋势配置
+  const avgPlayOption: echarts.EChartsOption = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#1f2937',
+      borderColor: '#374151',
+      textStyle: { color: '#fff' },
+      formatter: (params: any) => `${params[0].name}<br/>平均播放量: ${formatNumber(params[0].value)}`,
+    },
+    grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: trendData.map(d => d.date),
+      axisLabel: { color: '#9ca3af', fontSize: 11 },
+      axisLine: { lineStyle: { color: '#374151' } },
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#9ca3af', fontSize: 11, formatter: (v: number) => formatNumber(v) },
+      splitLine: { lineStyle: { color: '#374151', type: 'dashed' } },
+    },
+    dataZoom: [
+      { type: 'slider', start: 0, end: 100, bottom: 10 },
+      { type: 'inside', start: 0, end: 100 },
+    ],
+    series: [{
+      name: '平均播放量',
+      type: 'line',
+      smooth: true,
+      data: trendData.map(d => d.avgPlayCount),
+      lineStyle: { color: '#10b981', width: 2 },
+      itemStyle: { color: '#10b981' },
+      symbol: 'circle',
+      symbolSize: 6,
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(16, 185, 129, 0.8)' },
+          { offset: 1, color: 'rgba(16, 185, 129, 0.1)' },
+        ]),
+      },
+    }],
+  };
+
+  // 传播指数趋势配置
+  const spreadOption: echarts.EChartsOption = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#1f2937',
+      borderColor: '#374151',
+      textStyle: { color: '#fff' },
+      formatter: (params: any) => `${params[0].name}<br/>传播指数: ${params[0].value?.toFixed(2)}`,
+    },
+    grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: trendData.map(d => d.date),
+      axisLabel: { color: '#9ca3af', fontSize: 11 },
+      axisLine: { lineStyle: { color: '#374151' } },
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#9ca3af', fontSize: 11 },
+      splitLine: { lineStyle: { color: '#374151', type: 'dashed' } },
+    },
+    dataZoom: [
+      { type: 'slider', start: 0, end: 100, bottom: 10 },
+      { type: 'inside', start: 0, end: 100 },
+    ],
+    series: [{
+      name: '传播指数',
+      type: 'line',
+      smooth: true,
+      data: trendData.map(d => d.avgSpreadIndex),
+      lineStyle: { color: '#f59e0b', width: 3 },
+      itemStyle: { color: '#f59e0b' },
+      symbol: 'circle',
+      symbolSize: 8,
+    }],
+  };
+
+  // 关键词排行配置
+  const topKeywordsData = keywordPerformance.slice(0, 20);
+  const keywordOption: echarts.EChartsOption = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#1f2937',
+      borderColor: '#374151',
+      textStyle: { color: '#fff' },
+      axisPointer: { type: 'shadow' },
+    },
+    grid: { left: '3%', right: '4%', bottom: '3%', top: '3%', containLabel: true },
+    xAxis: {
+      type: 'value',
+      axisLabel: { color: '#9ca3af', fontSize: 11, formatter: (v: number) => formatNumber(v) },
+      splitLine: { lineStyle: { color: '#374151', type: 'dashed' } },
+    },
+    yAxis: {
+      type: 'category',
+      data: topKeywordsData.map(d => d.keyword).reverse(),
+      axisLabel: { color: '#9ca3af', fontSize: 11 },
+      axisLine: { lineStyle: { color: '#374151' } },
+    },
+    dataZoom: [
+      { type: 'slider', yAxisIndex: 0, start: 0, end: 100, right: 10 },
+      { type: 'inside', yAxisIndex: 0, start: 0, end: 100 },
+    ],
+    series: [{
+      name: '平均播放量',
+      type: 'bar',
+      data: topKeywordsData.map((d, i) => ({
+        value: d.avgPlayCount,
+        itemStyle: {
+          color: i < 3 ? '#f59e0b' : i < 10 ? '#3b82f6' : '#6366f1',
+          borderRadius: [0, 4, 4, 0],
+        },
+      })).reverse(),
+    }],
+  };
+
+  // 全局暴露跳转函数
+  if (typeof window !== 'undefined') {
+    (window as any).goToMonth = goToMonth;
   }
 
   return (
@@ -178,69 +489,24 @@ export default function TrendsPage() {
         {/* 播放量趋势 */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="text-2xl">📊</span>
-              播放量趋势
-            </CardTitle>
-            <p className="text-sm text-gray-600">悬停查看详情，点击上方月份按钮跳转</p>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <span className="text-2xl">📊</span>
+                播放量趋势
+              </CardTitle>
+              <Button variant="outline" size="sm" onClick={() => exportChartAsPNG(playCountChartRef, 'play-count-trend')}>
+                导出PNG
+              </Button>
+            </div>
+            <p className="text-sm text-gray-600">支持缩放和拖拽查看</p>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={400}>
-              <AreaChart 
-                data={trendData}
-                onMouseMove={(e) => {
-                  if (e?.activePayload?.[0]?.payload?.date) {
-                    setActiveDate(e.activePayload[0].payload.date);
-                  }
-                }}
-                onMouseLeave={() => setActiveDate(null)}
-              >
-                <defs>
-                  <linearGradient id="colorPlayCount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 12 }} />
-                <YAxis tick={{ fill: '#9ca3af', fontSize: 12 }} tickFormatter={(value) => formatNumber(value)} />
-                <Tooltip 
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl">
-                          <p className="text-white font-bold mb-2">{label}</p>
-                          {payload.map((entry: any, index: number) => (
-                            <p key={index} style={{ color: entry.color }} className="text-sm">
-                              {entry.name}: {typeof entry.value === 'number' && entry.value > 1000 
-                                ? formatNumber(entry.value) 
-                                : entry.value?.toFixed?.(2) || entry.value}
-                            </p>
-                          ))}
-                          <Button
-                            size="sm"
-                            className="mt-3 w-full bg-blue-600 hover:bg-blue-700"
-                            onClick={() => goToMonth(label)}
-                          >
-                            查看该月视频 →
-                          </Button>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="playCount" 
-                  stroke="#3b82f6" 
-                  strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorPlayCount)" 
-                  name="播放量"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <ReactECharts
+              ref={playCountChartRef}
+              option={playCountOption}
+              style={{ height: 400 }}
+              opts={{ renderer: 'canvas' }}
+            />
           </CardContent>
         </Card>
 
@@ -249,94 +515,46 @@ export default function TrendsPage() {
           {/* 互动数据趋势 */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <span className="text-xl">💬</span>
-                互动数据趋势
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <span className="text-xl">💬</span>
+                  互动数据趋势
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={() => exportChartAsPNG(interactionChartRef, 'interaction-trend')}>
+                  导出PNG
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={trendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 11 }} />
-                  <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} tickFormatter={(value) => formatNumber(value)} />
-                  <Tooltip 
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl">
-                            <p className="text-white font-bold mb-2">{label}</p>
-                            {payload.map((entry: any, index: number) => (
-                              <p key={index} style={{ color: entry.color }} className="text-sm">
-                                {entry.name}: {formatNumber(entry.value)}
-                              </p>
-                            ))}
-                            <Button
-                              size="sm"
-                              className="mt-3 w-full bg-blue-600 hover:bg-blue-700"
-                              onClick={() => goToMonth(label)}
-                            >
-                              查看该月视频 →
-                            </Button>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Legend />
-                  <Line type="monotone" dataKey="likes" stroke="#f43f5e" strokeWidth={2} dot={{ fill: '#f43f5e', strokeWidth: 2, r: 4 }} name="点赞数" />
-                  <Line type="monotone" dataKey="comments" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 4 }} name="评论数" />
-                  <Line type="monotone" dataKey="shares" stroke="#06b6d4" strokeWidth={2} dot={{ fill: '#06b6d4', strokeWidth: 2, r: 4 }} name="分享数" />
-                </LineChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                ref={interactionChartRef}
+                option={interactionOption}
+                style={{ height: 350 }}
+                opts={{ renderer: 'canvas' }}
+              />
             </CardContent>
           </Card>
 
           {/* 内容产出与爆款趋势 */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <span className="text-xl">🔥</span>
-                内容产出与爆款趋势
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <span className="text-xl">🔥</span>
+                  内容产出与爆款趋势
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={() => exportChartAsPNG(contentChartRef, 'content-trend')}>
+                  导出PNG
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <ComposedChart data={trendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 11 }} />
-                  <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} />
-                  <Tooltip 
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl">
-                            <p className="text-white font-bold mb-2">{label}</p>
-                            {payload.map((entry: any, index: number) => (
-                              <p key={index} style={{ color: entry.color }} className="text-sm">
-                                {entry.name}: {entry.value}
-                              </p>
-                            ))}
-                            <Button
-                              size="sm"
-                              className="mt-3 w-full bg-blue-600 hover:bg-blue-700"
-                              onClick={() => goToMonth(label)}
-                            >
-                              查看该月视频 →
-                            </Button>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Legend />
-                  <Bar dataKey="videoCount" fill="#6366f1" name="总视频数" radius={[4, 4, 0, 0]} />
-                  <Line type="monotone" dataKey="hotCount" stroke="#ef4444" strokeWidth={2} dot={{ fill: '#ef4444', strokeWidth: 2, r: 4 }} name="爆款数量" />
-                  <Line type="monotone" dataKey="qualityCount" stroke="#22c55e" strokeWidth={2} dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }} name="优质内容" />
-                </ComposedChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                ref={contentChartRef}
+                option={contentOption}
+                style={{ height: 350 }}
+                opts={{ renderer: 'canvas' }}
+              />
             </CardContent>
           </Card>
         </div>
@@ -346,90 +564,46 @@ export default function TrendsPage() {
           {/* 平均播放量趋势 */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <span className="text-xl">📈</span>
-                平均播放量趋势
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <span className="text-xl">📈</span>
+                  平均播放量趋势
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={() => exportChartAsPNG(avgPlayChartRef, 'avg-play-trend')}>
+                  导出PNG
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={trendData}>
-                  <defs>
-                    <linearGradient id="colorAvgPlay" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 11 }} />
-                  <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} tickFormatter={(value) => formatNumber(value)} />
-                  <Tooltip 
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl">
-                            <p className="text-white font-bold mb-2">{label}</p>
-                            {payload.map((entry: any, index: number) => (
-                              <p key={index} style={{ color: entry.color }} className="text-sm">
-                                {entry.name}: {formatNumber(entry.value)}
-                              </p>
-                            ))}
-                            <Button
-                              size="sm"
-                              className="mt-3 w-full bg-blue-600 hover:bg-blue-700"
-                              onClick={() => goToMonth(label)}
-                            >
-                              查看该月视频 →
-                            </Button>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Area type="monotone" dataKey="avgPlayCount" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorAvgPlay)" name="平均播放量" />
-                </AreaChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                ref={avgPlayChartRef}
+                option={avgPlayOption}
+                style={{ height: 300 }}
+                opts={{ renderer: 'canvas' }}
+              />
             </CardContent>
           </Card>
 
           {/* 传播指数趋势 */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <span className="text-xl">🚀</span>
-                传播指数趋势
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <span className="text-xl">🚀</span>
+                  传播指数趋势
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={() => exportChartAsPNG(spreadChartRef, 'spread-index-trend')}>
+                  导出PNG
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={trendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="date" tick={{ fill: '#9ca3af', fontSize: 11 }} />
-                  <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} />
-                  <Tooltip 
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl">
-                            <p className="text-white font-bold mb-2">{label}</p>
-                            <p className="text-amber-500 text-sm">传播指数: {payload[0]?.value?.toFixed(2)}</p>
-                            <Button
-                              size="sm"
-                              className="mt-3 w-full bg-blue-600 hover:bg-blue-700"
-                              onClick={() => goToMonth(label)}
-                            >
-                              查看该月视频 →
-                            </Button>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Line type="monotone" dataKey="avgSpreadIndex" stroke="#f59e0b" strokeWidth={3} dot={{ fill: '#f59e0b', strokeWidth: 2, r: 5 }} name="传播指数" />
-                </LineChart>
-              </ResponsiveContainer>
+              <ReactECharts
+                ref={spreadChartRef}
+                option={spreadOption}
+                style={{ height: 300 }}
+                opts={{ renderer: 'canvas' }}
+              />
             </CardContent>
           </Card>
         </div>
@@ -437,32 +611,24 @@ export default function TrendsPage() {
         {/* 关键词播放量排行 */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="text-2xl">🏷️</span>
-              关键词播放量排行 TOP 20
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <span className="text-2xl">🏷️</span>
+                关键词播放量排行 TOP 20
+              </CardTitle>
+              <Button variant="outline" size="sm" onClick={() => exportChartAsPNG(keywordChartRef, 'keyword-ranking')}>
+                导出PNG
+              </Button>
+            </div>
             <p className="text-sm text-gray-600">按平均播放量排序，发现高价值关键词</p>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={keywordPerformance.slice(0, 20)} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis type="number" tick={{ fill: '#9ca3af', fontSize: 11 }} tickFormatter={(v) => formatNumber(v)} />
-                <YAxis dataKey="keyword" type="category" tick={{ fill: '#9ca3af', fontSize: 11 }} width={80} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '6px' }}
-                  formatter={(value: number, name: string) => [
-                    name === 'avgPlayCount' ? formatNumber(value) : value,
-                    name === 'avgPlayCount' ? '平均播放量' : name === 'count' ? '使用次数' : '传播指数'
-                  ]}
-                />
-                <Bar dataKey="avgPlayCount" fill="#3b82f6" radius={[0, 4, 4, 0]} name="平均播放量">
-                  {keywordPerformance.slice(0, 20).map((entry, index) => (
-                    <cell key={`cell-${index}`} fill={index < 3 ? '#f59e0b' : index < 10 ? '#3b82f6' : '#6366f1'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <ReactECharts
+              ref={keywordChartRef}
+              option={keywordOption}
+              style={{ height: 400 }}
+              opts={{ renderer: 'canvas' }}
+            />
           </CardContent>
         </Card>
 
@@ -492,8 +658,8 @@ export default function TrendsPage() {
                 </thead>
                 <tbody>
                   {trendData.slice(-12).reverse().map((item) => (
-                    <tr 
-                      key={item.date} 
+                    <tr
+                      key={item.date}
                       className="border-b hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
                       onClick={() => goToMonth(item.date)}
                     >
