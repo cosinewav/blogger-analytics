@@ -418,48 +418,56 @@ export default function TrendsPage() {
         <p className="text-gray-600 mb-8">深入分析内容表现、关键词效果与传播趋势</p>
 
         {/* 核心指标卡片 */}
-        <div className="grid gap-4 md:grid-cols-4 mb-8">
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/keywords')}>
-            <CardContent className="pt-6">
-              <div className="text-sm opacity-80">最高频关键词</div>
-              <div className="text-2xl font-bold mt-2">{topKeywords[0]?.keyword || '-'}</div>
-              <div className="text-xs opacity-70 mt-1">使用 {topKeywords[0]?.count || 0} 次</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/keywords')}>
-            <CardContent className="pt-6">
-              <div className="text-sm opacity-80">最高播放关键词</div>
-              <div className="text-2xl font-bold mt-2">{keywordPerformance[0]?.keyword || '-'}</div>
-              <div className="text-xs opacity-70 mt-1">平均 {formatNumber(keywordPerformance[0]?.avgPlayCount || 0)} 播放</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/keywords')}>
-            <CardContent className="pt-6">
-              <div className="text-sm opacity-80">最佳传播关键词</div>
-              <div className="text-2xl font-bold mt-2">
-                {[...keywordPerformance].sort((a, b) => b.avgSpreadIndex - a.avgSpreadIndex)[0]?.keyword || '-'}
-              </div>
-              <div className="text-xs opacity-70 mt-1">
-                平均指数 {[...keywordPerformance].sort((a, b) => b.avgSpreadIndex - a.avgSpreadIndex)[0]?.avgSpreadIndex.toFixed(2) || 0}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
-            <CardContent className="pt-6">
-              <div className="text-sm opacity-80">爆款内容占比</div>
-              <div className="text-2xl font-bold mt-2">
-                {(() => {
-                  const total = spreadDistribution.reduce((sum, d) => sum + d.value, 0);
-                  const hot = spreadDistribution.filter(d => d.name.includes('爆款')).reduce((sum, d) => sum + d.value, 0);
-                  return total > 0 ? `${((hot / total) * 100).toFixed(1)}%` : '0%';
-                })()}
-              </div>
-              <div className="text-xs opacity-70 mt-1">
-                {spreadDistribution.filter(d => d.name.includes('爆款')).reduce((sum, d) => sum + d.value, 0)} 个爆款视频
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StaggerContainer className="grid gap-4 md:grid-cols-4 mb-8">
+          <StaggerItem>
+            <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/keywords')}>
+              <CardContent className="pt-6">
+                <div className="text-sm opacity-80">最高频关键词</div>
+                <div className="text-2xl font-bold mt-2">{topKeywords[0]?.keyword || '-'}</div>
+                <div className="text-xs opacity-70 mt-1">使用 <AnimatedNumber value={topKeywords[0]?.count || 0} /> 次</div>
+              </CardContent>
+            </Card>
+          </StaggerItem>
+          <StaggerItem>
+            <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/keywords')}>
+              <CardContent className="pt-6">
+                <div className="text-sm opacity-80">最高播放关键词</div>
+                <div className="text-2xl font-bold mt-2">{keywordPerformance[0]?.keyword || '-'}</div>
+                <div className="text-xs opacity-70 mt-1">平均 <AnimatedNumber value={keywordPerformance[0]?.avgPlayCount || 0} formatFn={formatChineseNumber} /> 播放</div>
+              </CardContent>
+            </Card>
+          </StaggerItem>
+          <StaggerItem>
+            <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push('/keywords')}>
+              <CardContent className="pt-6">
+                <div className="text-sm opacity-80">最佳传播关键词</div>
+                <div className="text-2xl font-bold mt-2">
+                  {[...keywordPerformance].sort((a, b) => b.avgSpreadIndex - a.avgSpreadIndex)[0]?.keyword || '-'}
+                </div>
+                <div className="text-xs opacity-70 mt-1">
+                  平均指数 <AnimatedNumber value={([...keywordPerformance].sort((a, b) => b.avgSpreadIndex - a.avgSpreadIndex)[0]?.avgSpreadIndex || 0) * 100} formatFn={(v) => (v / 100).toFixed(2)} />
+                </div>
+              </CardContent>
+            </Card>
+          </StaggerItem>
+          <StaggerItem>
+            <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
+              <CardContent className="pt-6">
+                <div className="text-sm opacity-80">爆款内容占比</div>
+                <div className="text-2xl font-bold mt-2">
+                  {(() => {
+                    const total = spreadDistribution.reduce((sum, d) => sum + d.value, 0);
+                    const hot = spreadDistribution.filter(d => d.name.includes('爆款')).reduce((sum, d) => sum + d.value, 0);
+                    return total > 0 ? <AnimatedNumber value={(hot / total) * 100} formatFn={(v) => `${v.toFixed(1)}%`} /> : '0%';
+                  })()}
+                </div>
+                <div className="text-xs opacity-70 mt-1">
+                  <AnimatedNumber value={spreadDistribution.filter(d => d.name.includes('爆款')).reduce((sum, d) => sum + d.value, 0)} /> 个爆款视频
+                </div>
+              </CardContent>
+            </Card>
+          </StaggerItem>
+        </StaggerContainer>
 
         {/* 快速月份选择器 */}
         <Card className="mb-6">
