@@ -133,15 +133,11 @@ export default function TrendsPage() {
       textStyle: { color: '#fff' },
       formatter: (params: any) => {
         const data = params[0];
-        return `
-          <div style="padding: 8px;">
-            <p style="font-weight: bold; margin-bottom: 8px;">${data.name}</p>
-            <p style="color: #3b82f6;">播放量: ${formatNumber(data.value)}</p>
-            <button onclick="window.goToMonth('${data.name}')" style="margin-top: 8px; padding: 4px 12px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
-              查看该月视频 →
-            </button>
-          </div>
-        `;
+        return `<div style="padding: 8px;">
+          <p style="font-weight: bold; margin-bottom: 8px;">${data.name}</p>
+          <p style="color: #3b82f6;">播放量: ${formatNumber(data.value)}</p>
+          <p style="color: #9ca3af; font-size: 12px; margin-top: 4px;">💡 使用上方"快速跳转"按钮查看该月视频</p>
+        </div>`;
       },
     },
     grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
@@ -488,11 +484,6 @@ export default function TrendsPage() {
       },
     }],
   } : {};
-
-  // 全局暴露跳转函数
-  if (typeof window !== 'undefined') {
-    (window as any).goToMonth = goToMonth;
-  }
 
   return (
     <main className="p-8">
