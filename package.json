@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sync": "npx tsx scripts/sync-feishu-data.ts",
+    "sync:profiles": "npx tsx scripts/sync-fan-profiles.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",
