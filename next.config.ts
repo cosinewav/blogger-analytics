@@ -37,7 +37,10 @@ const nextConfig: NextConfig = {
   generateEtags: true,
 
   // Output configuration
-  output: 'standalone',
+  output: 'export',
+  
+  // Enable trailing slashes for static hosting (creates /trends/index.html instead of /trends.html)
+  trailingSlash: true,
 };
 
 export default nextConfig;
