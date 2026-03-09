@@ -71,7 +71,7 @@ export function DiffHighlight({
       <CardContent>
         <div className="space-y-3">
           {data.map((item, index) => {
-            const { diff, percent } = calculateDiff(item.baseValue, item.compareValue);
+            const { diff, percent } = calculateDiff(Number(item.baseValue), Number(item.compareValue));
             const absPercent = Math.abs(percent);
 
             return (
@@ -92,13 +92,13 @@ export function DiffHighlight({
                   <div className="flex items-center gap-2">
                     <span className="text-gray-500">{baseAccount}:</span>
                     <span className="font-medium text-blue-600">
-                      {item.baseValue.toFixed(1)}{item.unit || '%'}
+                      {Number(item.baseValue).toFixed(1)}{item.unit || '%'}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-gray-500">{compareAccount}:</span>
                     <span className="font-medium text-purple-600">
-                      {item.compareValue.toFixed(1)}{item.unit || '%'}
+                      {Number(item.compareValue).toFixed(1)}{item.unit || '%'}
                     </span>
                   </div>
                 </div>
